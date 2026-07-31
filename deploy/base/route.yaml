@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: app-demo
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/part-of: monorepo-lab
+spec:
+  to:
+    kind: Service
+    name: app-demo
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
