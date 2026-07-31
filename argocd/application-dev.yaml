@@ -16,6 +16,17 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: monorepo-dev
+  ignoreDifferences:
+    - group: ""
+      kind: ServiceAccount
+      name: app-demo
+      namespace: monorepo-dev
+      jqPathExpressions:
+        - '.imagePullSecrets[] | select(.name | startswith("app-demo-dockercfg-"))'
+        - '.secrets[] | select(.name | startswith("app-demo-dockercfg-"))'
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=false
