@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-demo-dev
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/part-of: monorepo-lab
+    environment: dev
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rubenito77/openshift-tekton-argocd-quay-monorepo.git
+    targetRevision: main
+    path: deploy/environments/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monorepo-dev
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
