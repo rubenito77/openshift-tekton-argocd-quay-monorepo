@@ -1,0 +1,59 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: python-tests
+  namespace: monorepo-cicd
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/component: test
+    app.kubernetes.io/part-of: monorepo-lab
+spec:
+  description: Ejecuta las pruebas automatizadas de la aplicación Python.
+  params:
+    - name: REQUIREMENTS_FILE
+      type: string
+      default: requirements-test.txt
+    - name: TESTS_DIRECTORY
+      type: string
+      default: tests
+  workspaces:
+    - name: source
+      description: Código fuente clonado del repositorio.
+  steps:
+    - name: pytest
+      image: registry.access.redhat.com/ubi9/python-312:latest
+      workingDir: $(workspaces.source.path)/app
+      env:
+        - name: HOME
+          value: /tmp
+        - name: PIP_NO_CACHE_DIR
+          value: "1"
+        - name: PYTHONDONTWRITEBYTECODE
+          value: "1"
+      computeResources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        python -m venv /tmp/venv
+        source /tmp/venv/bin/activate
+
+        python -m pip install \
+          --requirement "$(params.REQUIREMENTS_FILE)"
+
+        python -m pytest \
+          "$(params.TESTS_DIRECTORY)" \
+          --verbose \
+          --disable-warnings

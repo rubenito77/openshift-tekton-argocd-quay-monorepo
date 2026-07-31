@@ -1,0 +1,114 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: app-demo-ci
+  namespace: monorepo-cicd
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/component: ci
+    app.kubernetes.io/part-of: monorepo-lab
+spec:
+  description: Clona, prueba, construye y publica la imagen de app-demo.
+  params:
+    - name: GIT_URL
+      type: string
+      default: https://github.com/rubenito77/openshift-tekton-argocd-quay-monorepo.git
+    - name: GIT_REVISION
+      type: string
+      default: main
+    - name: IMAGE
+      type: string
+      default: quay-z87gw.apps.cluster-z87gw.z87gw.sandbox3279.opentlc.com/monorepo-lab/app-demo:tekton-test
+    - name: APP_VERSION
+      type: string
+      default: 0.1.0
+    - name: IMAGE_TAG
+      type: string
+      default: tekton-test
+  workspaces:
+    - name: shared-workspace
+      description: Código fuente compartido entre las Tasks.
+    - name: dockerconfig
+      description: Credenciales para publicar la imagen en Quay.
+  tasks:
+    - name: clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: namespace
+            value: openshift-pipelines
+          - name: name
+            value: git-clone
+      params:
+        - name: URL
+          value: $(params.GIT_URL)
+        - name: REVISION
+          value: $(params.GIT_REVISION)
+        - name: DELETE_EXISTING
+          value: "true"
+        - name: DEPTH
+          value: "1"
+        - name: SUBMODULES
+          value: "false"
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: test
+      runAfter:
+        - clone
+      taskRef:
+        name: python-tests
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+    - name: build-and-push
+      runAfter:
+        - test
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: namespace
+            value: openshift-pipelines
+          - name: name
+            value: buildah
+      params:
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: DOCKERFILE
+          value: ./container/Containerfile
+        - name: CONTEXT
+          value: .
+        - name: BUILD_ARGS
+          value:
+            - APP_VERSION=$(params.APP_VERSION)
+            - IMAGE_TAG=$(params.IMAGE_TAG)
+        - name: STORAGE_DRIVER
+          value: vfs
+        - name: FORMAT
+          value: oci
+        - name: TLS_VERIFY
+          value: "true"
+        - name: SKIP_PUSH
+          value: "false"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: dockerconfig
+          workspace: dockerconfig
+  results:
+    - name: GIT_COMMIT
+      description: Commit probado por la Pipeline.
+      value: $(tasks.clone.results.COMMIT)
+    - name: GIT_URL
+      description: Repositorio clonado.
+      value: $(tasks.clone.results.URL)
+    - name: IMAGE_URL
+      description: Referencia de la imagen publicada.
+      value: $(tasks.build-and-push.results.IMAGE_URL)
+    - name: IMAGE_DIGEST
+      description: Digest inmutable de la imagen publicada.
+      value: $(tasks.build-and-push.results.IMAGE_DIGEST)
