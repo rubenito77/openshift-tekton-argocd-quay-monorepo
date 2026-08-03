@@ -44,7 +44,7 @@ def home() -> str:
       <body>
         <main>
           <h1>{info["application"]}</h1>
-          <p>Aplicación disponible</p>
+          <p>Aplicación disponible mediante GitOps automatizado</p>
           <dl>
             <dt>Versión</dt><dd>{info["version"]}</dd>
             <dt>Ambiente</dt><dd>{info["environment"]}</dd>
