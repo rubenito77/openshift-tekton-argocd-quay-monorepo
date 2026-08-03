@@ -1,0 +1,97 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: app-demo-github-template
+  namespace: monorepo-cicd
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/component: trigger-template
+    app.kubernetes.io/part-of: monorepo-lab
+spec:
+  params:
+    - name: GIT_URL
+      description: URL HTTPS del repositorio recibido desde GitHub.
+
+    - name: GIT_REVISION
+      description: SHA exacto del commit recibido desde GitHub.
+
+    - name: GIT_REPOSITORY_SSH
+      description: URL SSH utilizada para publicar la actualización GitOps.
+
+    - name: GIT_BRANCH
+      description: Rama GitOps que debe actualizar Tekton.
+      default: main
+
+    - name: IMAGE_REPOSITORY
+      description: Repositorio de imágenes en Quay.
+      default: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo
+
+    - name: APP_VERSION
+      description: Versión funcional de la aplicación.
+      default: 0.1.0
+
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: app-demo-ci-webhook-
+        namespace: monorepo-cicd
+        labels:
+          app.kubernetes.io/name: app-demo
+          app.kubernetes.io/component: ci-gitops
+          app.kubernetes.io/part-of: monorepo-lab
+          triggers.tekton.dev/trigger: github-push-main
+        annotations:
+          monorepo-lab/source-revision: $(tt.params.GIT_REVISION)
+
+      spec:
+        pipelineRef:
+          name: app-demo-ci
+
+        taskRunTemplate:
+          serviceAccountName: pipeline
+
+        params:
+          - name: GIT_URL
+            value: $(tt.params.GIT_URL)
+
+          - name: GIT_REVISION
+            value: $(tt.params.GIT_REVISION)
+
+          - name: IMAGE_REPOSITORY
+            value: $(tt.params.IMAGE_REPOSITORY)
+
+          - name: APP_VERSION
+            value: $(tt.params.APP_VERSION)
+
+          - name: GIT_REPOSITORY_SSH
+            value: $(tt.params.GIT_REPOSITORY_SSH)
+
+          - name: GIT_BRANCH
+            value: $(tt.params.GIT_BRANCH)
+
+        workspaces:
+          - name: shared-workspace
+            volumeClaimTemplate:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: app-demo
+                  app.kubernetes.io/component: ci-workspace
+                  app.kubernetes.io/part-of: monorepo-lab
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+
+          - name: dockerconfig
+            secret:
+              secretName: quay-tekton-credentials
+
+          - name: git-credentials
+            secret:
+              secretName: github-tekton-ssh
+
+        timeouts:
+          pipeline: 30m0s

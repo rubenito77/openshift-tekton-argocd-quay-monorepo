@@ -1,0 +1,43 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: app-demo-github-listener
+  namespace: monorepo-cicd
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/component: event-listener
+    app.kubernetes.io/part-of: monorepo-lab
+spec:
+  serviceAccountName: pipeline
+
+  triggers:
+    - name: github-push-main
+
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secretToken
+
+            - name: eventTypes
+              value:
+                - push
+
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.ref == 'refs/heads/main' &&
+                body.deleted == false &&
+                body.head_commit != null &&
+                !body.head_commit.message.contains('[skip ci]')
+
+      bindings:
+        - ref: app-demo-github-binding
+
+      template:
+        ref: app-demo-github-template

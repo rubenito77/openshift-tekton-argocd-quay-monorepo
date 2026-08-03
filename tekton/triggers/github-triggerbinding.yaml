@@ -1,0 +1,22 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: app-demo-github-binding
+  namespace: monorepo-cicd
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/component: trigger-binding
+    app.kubernetes.io/part-of: monorepo-lab
+spec:
+  params:
+    - name: GIT_URL
+      value: $(body.repository.clone_url)
+
+    - name: GIT_REVISION
+      value: $(body.after)
+
+    - name: GIT_REPOSITORY_SSH
+      value: $(body.repository.ssh_url)
+
+    - name: GIT_BRANCH
+      value: main
