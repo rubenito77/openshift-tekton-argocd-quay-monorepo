@@ -87,10 +87,10 @@ spec:
           value: ./container/Containerfile
         - name: CONTEXT
           value: .
-        - name: BUILD_ARGS
-          value:
-            - APP_VERSION=$(params.APP_VERSION)
-            - IMAGE_TAG=$(tasks.clone.results.COMMIT)
+        - name: BUILD_EXTRA_ARGS
+          value: >-
+            --build-arg=APP_VERSION=$(params.APP_VERSION)
+            --build-arg=IMAGE_TAG=$(tasks.clone.results.COMMIT)
         - name: STORAGE_DRIVER
           value: vfs
         - name: FORMAT
