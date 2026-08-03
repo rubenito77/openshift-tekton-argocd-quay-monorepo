@@ -18,7 +18,7 @@ spec:
     - name: GIT_REVISION
       value: main
     - name: IMAGE
-      value: quay-z87gw.apps.cluster-z87gw.z87gw.sandbox3279.opentlc.com/monorepo-lab/app-demo:tekton-test
+      value: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo:tekton-test
     - name: APP_VERSION
       value: 0.1.0
     - name: IMAGE_TAG

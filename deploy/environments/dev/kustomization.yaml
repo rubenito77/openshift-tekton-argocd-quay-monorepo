@@ -5,7 +5,7 @@ resources:
   - ../../base
 images:
   - name: app-demo
-    newName: quay-z87gw.apps.cluster-z87gw.z87gw.sandbox3279.opentlc.com/monorepo-lab/app-demo
+    newName: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo
     newTag: 0.1.0
 configMapGenerator:
   - name: app-demo-config
