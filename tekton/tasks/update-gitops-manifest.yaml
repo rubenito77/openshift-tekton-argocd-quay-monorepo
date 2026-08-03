@@ -1,0 +1,129 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: update-gitops-manifest
+  namespace: monorepo-cicd
+  labels:
+    app.kubernetes.io/name: app-demo
+    app.kubernetes.io/component: gitops-update
+    app.kubernetes.io/part-of: monorepo-lab
+spec:
+  description: Actualiza el tag de Kustomize y publica el cambio GitOps en GitHub.
+  params:
+    - name: IMAGE_TAG
+      type: string
+      description: Tag inmutable que debe declarar Kustomize.
+    - name: MANIFEST_FILE
+      type: string
+      default: deploy/environments/dev/kustomization.yaml
+    - name: GIT_REPOSITORY_SSH
+      type: string
+      default: git@github.com:rubenito77/openshift-tekton-argocd-quay-monorepo.git
+    - name: GIT_BRANCH
+      type: string
+      default: main
+    - name: GIT_USER_NAME
+      type: string
+      default: Tekton GitOps
+    - name: GIT_USER_EMAIL
+      type: string
+      default: tekton-gitops@example.invalid
+  workspaces:
+    - name: source
+      description: Repositorio clonado que contiene los manifiestos GitOps.
+    - name: ssh-credentials
+      description: Clave SSH y known_hosts para escribir en GitHub.
+  results:
+    - name: GITOPS_COMMIT
+      description: Commit GitOps creado; queda vacío si no había cambios.
+  steps:
+    - name: update-and-push
+      image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.18
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: HOME
+          value: /tmp/git-home
+        - name: PARAM_IMAGE_TAG
+          value: $(params.IMAGE_TAG)
+        - name: PARAM_MANIFEST_FILE
+          value: $(params.MANIFEST_FILE)
+        - name: PARAM_GIT_REPOSITORY_SSH
+          value: $(params.GIT_REPOSITORY_SSH)
+        - name: PARAM_GIT_BRANCH
+          value: $(params.GIT_BRANCH)
+        - name: PARAM_GIT_USER_NAME
+          value: $(params.GIT_USER_NAME)
+        - name: PARAM_GIT_USER_EMAIL
+          value: $(params.GIT_USER_EMAIL)
+        - name: SSH_CREDENTIALS_PATH
+          value: $(workspaces.ssh-credentials.path)
+        - name: RESULT_GITOPS_COMMIT
+          value: $(results.GITOPS_COMMIT.path)
+      computeResources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 256Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        test -f "${PARAM_MANIFEST_FILE}"
+        test -f "${SSH_CREDENTIALS_PATH}/ssh-privatekey"
+        test -f "${SSH_CREDENTIALS_PATH}/known_hosts"
+
+        mkdir -p "${HOME}/.ssh"
+        chmod 700 "${HOME}/.ssh"
+
+        cp "${SSH_CREDENTIALS_PATH}/ssh-privatekey"           "${HOME}/.ssh/id_ed25519"
+        cp "${SSH_CREDENTIALS_PATH}/known_hosts"           "${HOME}/.ssh/known_hosts"
+
+        chmod 600           "${HOME}/.ssh/id_ed25519"           "${HOME}/.ssh/known_hosts"
+
+        export GIT_SSH_COMMAND="ssh -i ${HOME}/.ssh/id_ed25519 -o IdentitiesOnly=yes -o UserKnownHostsFile=${HOME}/.ssh/known_hosts"
+
+        git config --global --add safe.directory           "$(workspaces.source.path)"
+        git config user.name "${PARAM_GIT_USER_NAME}"
+        git config user.email "${PARAM_GIT_USER_EMAIL
+        git remote set-url origin "${PARAM_GIT_REPOSITORY_SSH}"
+
+        CURRENT_TAG="$(
+          awk '/^[[:space:]]*newTag:/ {print $2; exit}' \
+            "${PARAM_MANIFEST_FILE}"
+        )"
+
+        printf 'Current tag: %s\n' "${CURRENT_TAG}"
+        printf 'Desired tag: %s\n' "${PARAM_IMAGE_TAG}"
+
+        sed -i -E \
+          "s#^([[:space:]]*newTag:)[[:space:]]*.*#\\1 ${PARAM_IMAGE_TAG}#" \
+          "${PARAM_MANIFEST_FILE}"
+
+        UPDATED_TAG="$(
+          awk '/^[[:space:]]*newTag:/ {print $2; exit}' \
+            "${PARAM_MANIFEST_FILE}"
+         )"
+
+        test "${UPDATED_TAG}" = "${PARAM_IMAGE_TAG}"
+
+        if git diff --quiet -- "${PARAM_MANIFEST_FILE}"; then
+          echo -n '' > "${RESULT_GITOPS_COMMIT}"
+          echo "GitOps manifest already contains the requested tag."
+          exit 0
+        fi
+
+        git diff -- "${PARAM_MANIFEST_FILE}"
+        git add "${PARAM_MANIFEST_FILE}"
+        git commit \
+          -m "chore(gitops): deploy ${PARAM_IMAGE_TAG} [skip ci]"
+        git push origin "HEAD:${PARAM_GIT_BRANCH}"
+
+        git rev-parse HEAD | tr -d '\n' > "${RESULT_GITOPS_COMMIT}"

@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: ci
     app.kubernetes.io/part-of: monorepo-lab
 spec:
-  description: Clona, prueba, construye y publica la imagen de app-demo.
+  description: Prueba, publica una imagen inmutable y actualiza el manifiesto GitOps.
   params:
     - name: GIT_URL
       type: string
@@ -16,20 +16,25 @@ spec:
     - name: GIT_REVISION
       type: string
       default: main
-    - name: IMAGE
+    - name: IMAGE_REPOSITORY
       type: string
-      default: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo:tekton-test
+      default: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo
     - name: APP_VERSION
       type: string
       default: 0.1.0
-    - name: IMAGE_TAG
+    - name: GIT_REPOSITORY_SSH
       type: string
-      default: tekton-test
+      default: git@github.com:rubenito77/openshift-tekton-argocd-quay-monorepo.git
+    - name: GIT_BRANCH
+      type: string
+      default: main
   workspaces:
     - name: shared-workspace
       description: Código fuente compartido entre las Tasks.
     - name: dockerconfig
       description: Credenciales para publicar la imagen en Quay.
+    - name: git-credentials
+      description: Deploy key SSH para actualizar el repositorio GitOps.
   tasks:
     - name: clone
       taskRef:
@@ -77,7 +82,7 @@ spec:
             value: buildah
       params:
         - name: IMAGE
-          value: $(params.IMAGE)
+          value: $(params.IMAGE_REPOSITORY):$(tasks.clone.results.COMMIT)
         - name: DOCKERFILE
           value: ./container/Containerfile
         - name: CONTEXT
@@ -85,7 +90,7 @@ spec:
         - name: BUILD_ARGS
           value:
             - APP_VERSION=$(params.APP_VERSION)
-            - IMAGE_TAG=$(params.IMAGE_TAG)
+            - IMAGE_TAG=$(tasks.clone.results.COMMIT)
         - name: STORAGE_DRIVER
           value: vfs
         - name: FORMAT
@@ -99,16 +104,31 @@ spec:
           workspace: shared-workspace
         - name: dockerconfig
           workspace: dockerconfig
+    - name: update-gitops
+      runAfter:
+        - build-and-push
+      taskRef:
+        name: update-gitops-manifest
+      params:
+        - name: IMAGE_TAG
+          value: $(tasks.clone.results.COMMIT)
+        - name: GIT_REPOSITORY_SSH
+          value: $(params.GIT_REPOSITORY_SSH)
+        - name: GIT_BRANCH
+          value: $(params.GIT_BRANCH)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: ssh-credentials
+          workspace: git-credentials
   results:
     - name: GIT_COMMIT
-      description: Commit probado por la Pipeline.
       value: $(tasks.clone.results.COMMIT)
     - name: GIT_URL
-      description: Repositorio clonado.
       value: $(tasks.clone.results.URL)
     - name: IMAGE_URL
-      description: Referencia de la imagen publicada.
       value: $(tasks.build-and-push.results.IMAGE_URL)
     - name: IMAGE_DIGEST
-      description: Digest inmutable de la imagen publicada.
       value: $(tasks.build-and-push.results.IMAGE_DIGEST)
+    - name: GITOPS_COMMIT
+      value: $(tasks.update-gitops.results.GITOPS_COMMIT)

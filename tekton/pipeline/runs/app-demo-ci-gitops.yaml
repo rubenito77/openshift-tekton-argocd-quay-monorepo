@@ -1,11 +1,11 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  generateName: app-demo-ci-build-
+  generateName: app-demo-ci-gitops-
   namespace: monorepo-cicd
   labels:
     app.kubernetes.io/name: app-demo
-    app.kubernetes.io/component: ci-build
+    app.kubernetes.io/component: ci-gitops
     app.kubernetes.io/part-of: monorepo-lab
 spec:
   pipelineRef:
@@ -17,12 +17,14 @@ spec:
       value: https://github.com/rubenito77/openshift-tekton-argocd-quay-monorepo.git
     - name: GIT_REVISION
       value: main
-    - name: IMAGE
-      value: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo:tekton-test
+    - name: IMAGE_REPOSITORY
+      value: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo
     - name: APP_VERSION
       value: 0.1.0
-    - name: IMAGE_TAG
-      value: tekton-test
+    - name: GIT_REPOSITORY_SSH
+      value: git@github.com:rubenito77/openshift-tekton-argocd-quay-monorepo.git
+    - name: GIT_BRANCH
+      value: main
   workspaces:
     - name: shared-workspace
       volumeClaimTemplate:
@@ -40,5 +42,8 @@ spec:
     - name: dockerconfig
       secret:
         secretName: quay-tekton-credentials
+    - name: git-credentials
+      secret:
+        secretName: github-tekton-ssh
   timeouts:
     pipeline: 30m0s
