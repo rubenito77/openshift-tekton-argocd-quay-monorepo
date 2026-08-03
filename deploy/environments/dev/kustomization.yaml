@@ -6,7 +6,7 @@ resources:
 images:
   - name: app-demo
     newName: quay-rrkn9.apps.cluster-rrkn9.rrkn9.sandbox449.opentlc.com/monorepo-lab/app-demo
-    newTag: 48cac5f451ee3d85c8a7f4f89a02116e0ce1adf4
+    newTag: c61c560e48b39b04f43bc0662b1d9d95c3a8617a
 configMapGenerator:
   - name: app-demo-config
     literals:
