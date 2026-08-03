@@ -13,6 +13,5 @@ configMapGenerator:
       - APP_NAME=app-demo
       - APP_VERSION=0.1.0
       - ENVIRONMENT=dev
-      - IMAGE_TAG=0.1.0
 generatorOptions:
   disableNameSuffixHash: true
